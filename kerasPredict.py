@@ -15,7 +15,7 @@ def auc( true_labels, predictions, weights = None ):
 class kerasModel():
 
     def __init__(self, file_name):
-        self.model = models.load_model( file_name, custom_objects = {'auc':auc} )
+        self.model = models.load_model( file_name, custom_objects = {'auc':auc, "backend":K} )
 
 
     #return model prediction given a list of inputs
