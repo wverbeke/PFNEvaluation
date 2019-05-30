@@ -38,7 +38,10 @@ PFNReader::~PFNReader(){
 void PFNReader::initializePythonAPI(){
 	Py_Initialize();
 	PyObject* sysPath = PySys_GetObject( "path" );
-	PyList_Insert( sysPath, 0, PyUnicode_FromString("./"));
+    std::string file_path = __FILE__;
+    std::string dir_path = file_path.substr(0, file_path.rfind("/"));
+    PyList_Insert( sysPath, 0, PyUnicode_FromString( dir_path.c_str() ));
+    PyList_Insert( sysPath, 0, PyUnicode_FromString("./"));
 }
 
 
