@@ -12,6 +12,7 @@
 
 
 int main(){
+    Bool_t   _JetIsFromHNL;
     Double_t _JetPt;
     Double_t _JetEta;
     Double_t _JetConstituentPt[50];
@@ -26,6 +27,7 @@ int main(){
     Int_t _JetConstituentNumberOfHits[50];
     Int_t _JetConstituentNumberOfPixelHits[50];
 
+    TBranch* b__JetIsFromHNL;
     TBranch* b__JetPt;
     TBranch* b__JetEta;
     TBranch* b__JetConstituentPt;
@@ -40,9 +42,10 @@ int main(){
     TBranch* b__JetConstituentNumberOfHits;
     TBranch* b__JetConstituentNumberOfPixelHits;
 
-    TFile* inputFile = TFile::Open("~/public/2l2q_analysis/trees/HNLtagger/final/full_analyzer/HNLtagger_muon_HeavyNeutrino_lljj_M-5_mu.root");
+    TFile* inputFile = TFile::Open("~/public/2l2q_analysis/trees/HNLtagger/final/full_analyzer/mergedFile.root");
     TTree* inputTree = (TTree*) inputFile->Get("HNLtagger_tree");
     
+    inputTree->SetBranchAddress("_JetIsFromHNL", &_JetIsFromHNL, &b__JetIsFromHNL);
     inputTree->SetBranchAddress("_JetPt", &_JetPt, &b__JetPt);
     inputTree->SetBranchAddress("_JetEta", &_JetEta, &b__JetEta);
     inputTree->SetBranchAddress("_JetConstituentPt", _JetConstituentPt, &b__JetConstituentPt);
@@ -57,9 +60,10 @@ int main(){
     inputTree->SetBranchAddress("_JetConstituentNumberOfHits", _JetConstituentNumberOfHits, &b__JetConstituentNumberOfHits);
     inputTree->SetBranchAddress("_JetConstituentNumberOfPixelHits", _JetConstituentNumberOfPixelHits, &b__JetConstituentNumberOfPixelHits);
 
-    PFNReader pfn( "/user/bvermass/heavyNeutrino/Dileptonprompt/CMSSW_10_2_14/src/deepLearning/jetTagger.h5", {50,11}, 2 );
+    PFNReader pfn( "/user/bvermass/heavyNeutrino/Dileptonprompt/CMSSW_10_2_14/src/deepLearning/jetTagger_reliso.h5", {50,11}, 2 );
 
-    TH1F *Model_output_histo = new TH1F("Model_output_histo", ";Model output;Events", 20, 0, 1);
+    TH1F *Model_output_histo_sig = new TH1F("Model_output_histo_sig", ";Model output;Events", 20, 0, 1);
+    TH1F *Model_output_histo_bkg = new TH1F("Model_output_histo_bkg", ";Model output;Events", 20, 0, 1);
 
     long unsigned nentries = inputTree->GetEntries();
     std::cout << "Number of entries: " << nentries << std::endl;
@@ -77,13 +81,15 @@ int main(){
         //PFN output
         double prediction = pfn.predict(  pfnInput, highlevelInput );
         if(entryIndex%(nentries/20) == 0) std::cout << "prediction: " << prediction << std::endl;
-        Model_output_histo->Fill(prediction);
+        if(_JetIsFromHNL) Model_output_histo_sig->Fill(prediction);
+        else Model_output_histo_bkg->Fill(prediction);
     }
 
     TString outputfilename = "modeloutputhisto.root";
     std::cout << "output to: " << outputfilename << std::endl;
     TFile *output = new TFile(outputfilename, "recreate");
-    Model_output_histo->Write();
+    Model_output_histo_sig->Write();
+    Model_output_histo_bkg->Write();
     output->Close();
     return 0;
 }
