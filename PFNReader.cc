@@ -7,8 +7,7 @@
 unsigned PFNReader::instanceCounter = 0;
 boost::python::object PFNReader::pythonModule = boost::python::object();
 
-
-PFNReader::PFNReader( const std::string& model_file_name, const std::pair<unsigned, unsigned>& pfnInputShape, const unsigned highlevelInputShape ):
+PFNReader::PFNReader( const std::string& model_file_name, const unsigned highlevelInputShape, const std::pair<unsigned, unsigned>& pfnInputShape ):
     pfnShape( pfnInputShape ), highlevelShape( highlevelInputShape )
 {
     if( instanceCounter == 0 ){
@@ -16,7 +15,15 @@ PFNReader::PFNReader( const std::string& model_file_name, const std::pair<unsign
 		loadPythonModule( "kerasPredict" );
     }
     ++instanceCounter;
-	loadKerasModel( model_file_name );
+
+    // if pfnInputShape is {0, 0}, the model we want to read is a BDT model which doesn't have any pfnInputShape variables
+    if( pfnInputShape.first == 0 and pfnInputShape.second == 0 ){
+        isPFN = false;
+        loadKerasModel("xgboostModel", model_file_name );
+    }else {
+        isPFN = true;
+	    loadKerasModel("kerasModel", model_file_name );
+    }
 }
 
 
@@ -54,9 +61,9 @@ void PFNReader::loadPythonModule( const std::string& module_name ){
 }
 
 
-void PFNReader::loadKerasModel( const std::string& model_name ){
+void PFNReader::loadKerasModel( const char * model_type, const std::string& model_name ){
 	try{
-		kerasModel =  pythonModule.attr("kerasModel")(model_name);
+		kerasModel =  pythonModule.attr( model_type )( model_name );
         predictRoutine = kerasModel.attr("predict");
 	} catch( ... ){
 		PyErr_Print();
@@ -85,7 +92,13 @@ bool PFNReader::checkHighlevelShape( const std::vector< double >& vec) const{
 }
 
 
-double PFNReader::predict( const std::vector< std::vector< double > >& pfnInput, const std::vector< double >& highlevelInput ) const{
+double PFNReader::predict( const std::vector< double >& highlevelInput, const std::vector< std::vector< double > >& pfnInput ) const{
+    if( isPFN ) return predictPFN( highlevelInput, pfnInput );
+    else return predictBDT( highlevelInput );
+}
+
+
+double PFNReader::predictPFN( const std::vector< double >& highlevelInput, const std::vector< std::vector< double > >& pfnInput ) const{
     if( !checkPfnShape( pfnInput ) ){
         throw std::invalid_argument( "PFN input vector has wrong shape. Shape is supposed to be (" + std::to_string( pfnShape.first ) + ", " + std::to_string( pfnShape.second ) + ")." );
     }
@@ -99,6 +112,16 @@ double PFNReader::predict( const std::vector< std::vector< double > >& pfnInput,
     boost::python::list pfn_list = vectorToPythonList( pfn_list_vector );
     boost::python::list highlevel_list = vectorToPythonList( highlevelInput );
 
-    boost::python::object pythonPrediction = predictRoutine( pfn_list, highlevel_list );
+    boost::python::object pythonPrediction = predictRoutine( highlevel_list, pfn_list );
+    return boost::python::extract< double >( pythonPrediction );
+}
+
+
+double PFNReader::predictBDT( const std::vector< double >& highlevelInput ) const{
+    if( !checkHighlevelShape( highlevelInput ) ){
+        throw std::invalid_argument( "BDT input vector has wrong shape. Shape is supposed to be (" + std::to_string( highlevelShape ) + ")." );
+    }
+    boost::python::list highlevel_list = vectorToPythonList( highlevelInput );
+    boost::python::object pythonPrediction = predictRoutine( highlevel_list );
     return boost::python::extract< double >( pythonPrediction );
 }
